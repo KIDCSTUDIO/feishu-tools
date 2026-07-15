@@ -564,7 +564,7 @@
 
     <!-- ── 操作 ── -->
     <div class="action-bar">
-      <button class="btn-primary" onclick="exportPDF()">📄 导出 PDF</button>
+      <button class="btn-primary" onclick="exportPDF()">📄 生成并下载报告</button>
       <button class="btn-outline" onclick="saveDraft()">💾 保存草稿</button>
       <button class="btn-ghost" onclick="loadDraft()">📂 加载草稿</button>
       <button class="btn-danger" onclick="resetAll()">🗑 清空重置</button>
@@ -1209,7 +1209,7 @@ function generateReportHTML() {
 }
 
 /* ══════════════════════════════════════
-   EXPORT — 新窗口预览 + data: 协议下载
+   EXPORT — 新窗口预览 + Blob 下载
    ══════════════════════════════════════ */
 function exportPDF() {
   saveAutoSummaryValues();
@@ -1219,29 +1219,36 @@ function exportPDF() {
   const model = val('productModel') || '未命名';
   const date = val('reviewDate') || new Date().toISOString().slice(0, 10);
   const filename = '样品评审报告_' + model + '_' + date + '.doc';
-  const dataUrl = 'data:application/msword;charset=utf-8,' + encodeURIComponent('﻿' + reportHTML);
+  // 创建 Blob（真浏览器环境，比 data: 协议更可靠）
+  const blob = new Blob(['﻿' + reportHTML], { type: 'application/msword;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
 
   // 顶部下载栏
   const toolbarHTML =
     '<div style="position:sticky;top:0;z-index:999;background:#1a56db;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:\'PingFang SC\',\'Microsoft YaHei\',sans-serif;">' +
     '<span style="font-weight:700;font-size:15px;">📄 样品评审报告</span>' +
-    '<a href="' + dataUrl + '" download="' + filename + '" style="padding:10px 18px;background:#fff;color:#1a56db;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;display:inline-block;">📥 下载 .doc 文件</a>' +
+    '<a href="DOWNLOAD_URL" download="' + filename + '" id="dl-link" style="padding:10px 18px;background:#fff;color:#1a56db;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;display:inline-block;">📥 下载 .doc 文件</a>' +
     '</div>' +
     '<p style="padding:8px 16px;background:#fffbe6;font-size:12px;color:#8a6d14;margin:0;font-family:\'PingFang SC\',\'Microsoft YaHei\',sans-serif;">' +
-    '👆 点击上方蓝色按钮直接下载。电脑端可打开后「文件 → 另存为 PDF」</p>' +
+    '👆 点击上方蓝色按钮下载。电脑端可打开后「文件 → 另存为 PDF」</p>' +
     '<p style="padding:4px 16px 8px;background:#fffbe6;font-size:12px;color:#8a6d14;margin:0;font-family:\'PingFang SC\',\'Microsoft YaHei\',sans-serif;">' +
-    '📱 手机端点「下载 .doc」后浏览器会自动保存。如未弹出，长按按钮 → 下载链接文件</p>';
+    '📱 手机端若未自动下载：点右上角 ⋮ → 在浏览器中打开 → 再点下载</p>';
 
-  const injectedHTML = reportHTML.replace('<body>', '<body>' + toolbarHTML);
+  const injectedHTML = reportHTML.replace('<body>',
+    '<body>' + toolbarHTML.replace('DOWNLOAD_URL', blobUrl));
 
   const w = window.open('', '_blank');
   if (!w) {
     showToast('⚠️ 弹窗被拦截，请允许本站弹窗');
+    URL.revokeObjectURL(blobUrl);
     return;
   }
   w.document.write(injectedHTML);
   w.document.close();
-  showToast('📄 报告已生成 → 点击上方蓝色按钮下载');
+
+  // 清理 blob（给足够时间下载）
+  setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+  showToast('📄 报告已生成 → 点击蓝色按钮下载');
 }
 
 /* ══════════════════════════════════════
