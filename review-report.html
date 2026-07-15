@@ -766,7 +766,7 @@ function renderAutoSummaryTable() {
     return;
   }
   let html = '<table class="summary-table"><thead><tr>';
-  html += '<th style="width:5%;">序号</th><th style="width:36%;">问题描述</th><th style="width:8%;">图片</th><th style="width:15%;">责任部门</th><th style="width:15%;">完成时间</th><th style="width:21%;">备注</th>';
+  html += '<th style="width:5%;">序号</th><th style="width:42%;">问题描述</th><th style="width:16%;">责任部门</th><th style="width:16%;">完成时间</th><th style="width:21%;">备注</th>';
   html += '</tr></thead><tbody>';
   rows.forEach((r, ri) => {
     const cached = _autoSummaryCache[r.idx] || {};
@@ -995,23 +995,21 @@ function generateReportHTML() {
     summaryHtml += `<tr>
       <td style="text-align:center;">${ri + 1}</td>
       <td>${h(r.desc)}</td>
-      <td style="text-align:center;">—</td>
       <td>${h(cached.dept || r.person || '')}</td>
       <td>${h(cached.deadline || '')}</td>
       <td>${h(cached.note || '')}</td>
     </tr>`;
   });
-  MANUAL_ISSUES.forEach((m, mi) => {
-    if (!m.desc) return;
-    summaryHtml += `<tr>
-      <td style="text-align:center;">M${mi + 1}</td>
-      <td>${h(m.desc)}</td>
-      <td style="text-align:center;">—</td>
-      <td>${h(m.dept)}</td>
-      <td>${h(m.deadline)}</td>
-      <td>${h(m.note)}</td>
-    </tr>`;
-  });
+	  MANUAL_ISSUES.forEach((m, mi) => {
+	    if (!m.desc) return;
+	    summaryHtml += `<tr>
+	      <td style="text-align:center;">M${mi + 1}</td>
+	      <td>${h(m.desc)}</td>
+	      <td>${h(m.dept)}</td>
+	      <td>${h(m.deadline)}</td>
+	      <td>${h(m.note)}</td>
+	    </tr>`;
+	  });
 
   const doc = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -1172,16 +1170,15 @@ function generateReportHTML() {
 <table>
 <colgroup>
   <col style="width:5%;">
-  <col style="width:38%;">
-  <col style="width:7%;">
-  <col style="width:14%;">
-  <col style="width:14%;">
-  <col style="width:22%;">
+  <col style="width:42%;">
+  <col style="width:16%;">
+  <col style="width:16%;">
+  <col style="width:21%;">
 </colgroup>
 <thead>
-  <tr><th>序号</th><th>问题描述</th><th>图片</th><th>责任部门</th><th>完成时间</th><th>备注</th></tr>
+  <tr><th>序号</th><th>问题描述</th><th>责任部门</th><th>完成时间</th><th>备注</th></tr>
 </thead>
-<tbody>${summaryHtml || '<tr><td colspan="6" style="text-align:center;color:#999;">无</td></tr>'}</tbody>
+<tbody>${summaryHtml || '<tr><td colspan="5" style="text-align:center;color:#999;">无</td></tr>'}</tbody>
 </table>
 
 <h2>签字确认</h2>
