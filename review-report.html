@@ -564,7 +564,7 @@
 
     <!-- ── 操作 ── -->
     <div class="action-bar">
-      <button class="btn-primary" onclick="exportPDF()">📄 生成报告（.doc）</button>
+      <button class="btn-primary" onclick="exportPDF()">📄 导出 PDF</button>
       <button class="btn-outline" onclick="saveDraft()">💾 保存草稿</button>
       <button class="btn-ghost" onclick="loadDraft()">📂 加载草稿</button>
       <button class="btn-danger" onclick="resetAll()">🗑 清空重置</button>
@@ -1206,48 +1206,26 @@ function generateReportHTML() {
 }
 
 /* ══════════════════════════════════════
-   DOWNLOAD .doc — 新窗口预览 + Blob 下载
+   EXPORT PDF — 浏览器原生打印（所见即所得）
    ══════════════════════════════════════ */
 function exportPDF() {
   saveAutoSummaryValues();
   saveManualValues();
   refreshAutoSummary();
   const reportHTML = generateReportHTML();
-  const model = val('productModel') || '未命名';
-  const date = val('reviewDate') || new Date().toISOString().slice(0, 10);
-  const filename = '样品评审报告_' + model + '_' + date + '.doc';
-  const blob = new Blob(['﻿' + reportHTML], { type: 'application/msword;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
 
   const w = window.open('', '_blank');
   if (!w) {
-    showToast('⚠️ 弹窗被拦截');
-    URL.revokeObjectURL(url);
+    showToast('⚠️ 弹窗被拦截，请允许本站弹窗');
     return;
   }
-
-  const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-  const downloadLink = isMobile
-    ? '<a href="' + url + '" download="' + filename + '" style="padding:10px 18px;background:#fff;color:#1a56db;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;display:inline-block;">📥 下载 .doc 文件</a>'
-    : '<a href="' + url + '" download="' + filename + '" id="auto-dl" style="padding:10px 18px;background:#fff;color:#1a56db;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;display:inline-block;">📥 下载 .doc 文件</a><script>setTimeout(function(){document.getElementById("auto-dl").click();},500);<\/script>';
-
-  const page =
-'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
-'<title>样品评审报告</title>' +
-'<style>' +
-'#dl-bar{position:sticky;top:0;z-index:999;background:#1a56db;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}' +
-'#dl-bar span{font-weight:700;font-size:15px;}' +
-'#dl-hint{padding:8px 16px;background:#fffbe6;font-size:12px;color:#8a6d14;margin:0;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}' +
-'</style></head><body>' +
-'<div id="dl-bar"><span>📄 样品评审报告</span>' + downloadLink + '</div>' +
-'<p id="dl-hint">👆 点击蓝色按钮下载 .doc，用 WPS/Word 打开后可另存为 PDF</p>' +
-reportHTML.replace(/<html[^>]*>/, '').replace(/<\/html>/, '').replace(/<head[^>]*>[\s\S]*?<\/head>/, '').replace(/<body[^>]*>/, '').replace(/<\/body>/, '') +
-'</body></html>';
-
-  w.document.write(page);
+  w.document.write(reportHTML);
   w.document.close();
-  setTimeout(function () { URL.revokeObjectURL(url); }, 120000);
-  showToast('📄 报告已生成 → 点击蓝色按钮下载');
+  // 等渲染完成后触发打印
+  setTimeout(function () {
+    w.print();
+  }, 600);
+  showToast('🖨 打印对话框已打开 → 选择「另存为 PDF」→ 保存');
 }
 
 /* ══════════════════════════════════════
