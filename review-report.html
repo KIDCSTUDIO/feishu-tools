@@ -1230,15 +1230,25 @@ function exportPDF() {
 '#dl-bar span{font-weight:700;font-size:15px;}' +
 '#dl-bar button{padding:10px 18px;background:#fff;color:#1a56db;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;}' +
 '#dl-hint{padding:8px 16px;background:#fffbe6;font-size:12px;color:#8a6d14;margin:0;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}' +
-'@media print{#dl-bar{display:none!important}#dl-hint{display:none!important}}' +
+'#report-area{width:100%;max-width:210mm;margin:0 auto;}' +
+'#report-area .Section1{page:auto;}' +
 '</style></head><body>' +
 '<div id="dl-bar"><span>📄 样品评审报告</span><button onclick="downloadPDF()">📥 下载 PDF</button></div>' +
-'<p id="dl-hint">👆 点击上方按钮下载。📱 手机如无反应：点 ⋮ → 在浏览器中打开</p>' +
+'<p id="dl-hint">👆 点击上方按钮下载 PDF。📱 手机无反应：点 ⋮ → 在浏览器中打开</p>' +
+'<div id="report-area">' +
 reportHTML.replace(/<html[^>]*>/, '').replace(/<\/html>/, '').replace(/<head[^>]*>[\s\S]*?<\/head>/, '').replace(/<body[^>]*>/, '').replace(/<\/body>/, '') +
+'</div>' +
 '<script>' +
 'function downloadPDF(){' +
-'  var el=document.querySelector(".Section1")||document.body;' +
-'  var opt={margin:[8,8,8,8],filename:"' + filename + '",image:{type:"jpeg",quality:0.95},html2canvas:{scale:2,useCORS:true,logging:false},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["avoid-all","css","legacy"]}};' +
+'  var el=document.getElementById("report-area");' +
+'  var opt={' +
+'    margin:[10,10,10,10],' +
+'    filename:"' + filename + '",' +
+'    image:{type:"jpeg",quality:0.95},' +
+'    html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794},' +
+'    jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},' +
+'    pagebreak:{mode:["avoid-all","css","legacy"]}' +
+'  };' +
 '  var btn=document.querySelector("#dl-bar button");' +
 '  btn.textContent="⏳ 生成中...";btn.disabled=true;' +
 '  html2pdf().set(opt).from(el).save().then(function(){' +
