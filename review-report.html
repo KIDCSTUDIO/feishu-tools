@@ -1,0 +1,1424 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes" />
+  <title>样品评审报告生成器</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --panel: #ffffff;
+      --text: #1a1a1a;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --accent: #1a56db;
+      --accent-2: #1340a0;
+      --red: #c92a2a;
+      --red-bg: #fff5f5;
+      --green: #087f5b;
+      --green-bg: #ecfdf5;
+      --gray: #9ca3af;
+      --gray-bg: #f9fafb;
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei UI", -apple-system, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .topbar-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .preview-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      background: #fff;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .preview-btn:active { background: #eef3ff; }
+
+    /* ── Main ── */
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 12px 12px 80px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      background: #fafafa;
+      border-bottom: 1px solid var(--line);
+      color: var(--accent-2);
+    }
+    .card-body { padding: 12px 14px; }
+
+    /* ── Fields ── */
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .row:last-child { margin-bottom: 0; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 140px;
+    }
+    .field.full { flex-basis: 100%; min-width: 100%; }
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      font: inherit;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(26,86,219,0.1);
+    }
+    textarea { min-height: 70px; resize: vertical; }
+
+    /* ── Details / Accordion ── */
+    .review-group {
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .review-group > summary {
+      padding: 13px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fafafa;
+      user-select: none;
+    }
+    .review-group > summary::-webkit-details-marker { display: none; }
+    .review-group > summary::after {
+      content: '▸';
+      font-size: 12px;
+      color: #999;
+      transition: transform .2s;
+      margin-left: 8px;
+    }
+    .review-group[open] > summary::after {
+      transform: rotate(90deg);
+    }
+    .review-group .group-body { padding: 6px 6px 2px; }
+
+    /* ── Item row ── */
+    .item-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 5px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 13px;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-num {
+      width: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 600;
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+    .item-name {
+      flex: 1;
+      min-width: 150px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .item-toggle {
+      display: flex;
+      gap: 0;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .item-toggle label {
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fff;
+      color: #999;
+      border-right: 1px solid var(--line);
+      transition: all .1s;
+      user-select: none;
+      min-width: 32px;
+      text-align: center;
+    }
+    .item-toggle label:last-child { border-right: none; }
+    .item-toggle input { display: none; }
+
+    .item-toggle .p-radio:checked + label { background: var(--green); color: #fff; }
+    .item-toggle .f-radio:checked + label { background: var(--red); color: #fff; }
+    .item-toggle .o-radio:checked + label { background: var(--gray); color: #fff; }
+
+    .item-fix { flex: 1; min-width: 110px; }
+    .item-fix input {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font-size: 12px;
+      background: #fafafa;
+    }
+    .item-fix input:focus { background: #fff; border-color: var(--accent); }
+    .item-person { width: 76px; flex-shrink: 0; }
+    .item-person input {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font-size: 12px;
+      background: #fafafa;
+    }
+
+    /* ── Summary table ── */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .summary-table th, .summary-table td {
+      border: 1px solid var(--line);
+      padding: 6px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .summary-table th {
+      background: #f5f5f5;
+      font-weight: 700;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .summary-table td input {
+      width: 100%;
+      border: none;
+      padding: 4px 2px;
+      font-size: 12px;
+      background: transparent;
+      border-radius: 3px;
+    }
+    .summary-table td input:focus { background: #fff; outline: 1px solid var(--accent); }
+    .summary-table .del-btn {
+      background: none;
+      border: none;
+      color: var(--red);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 6px;
+    }
+    .empty-hint {
+      text-align: center;
+      color: var(--muted);
+      padding: 14px;
+      font-size: 13px;
+    }
+
+    .sub-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #555;
+      margin: 10px 0 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* ── Images ── */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .img-slot {
+      border: 2px dashed var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      position: relative;
+    }
+    .img-slot.filled { border-style: solid; border-color: #bccde0; }
+    .img-slot img {
+      max-width: 100%;
+      max-height: 180px;
+      object-fit: contain;
+      border-radius: 4px;
+      display: block;
+      margin: 0 auto 6px;
+    }
+    .img-slot input[type=file] { width: 100%; font-size: 12px; }
+    .img-caption {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font-size: 12px;
+      text-align: left;
+      margin-top: 4px;
+    }
+    .img-del {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      border: none;
+      font-size: 14px;
+      line-height: 24px;
+      text-align: center;
+      cursor: pointer;
+      display: none;
+      z-index: 2;
+    }
+    .img-slot.filled .img-del { display: block; }
+
+    .add-img-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 7px 13px;
+      border: 1px dashed var(--accent);
+      border-radius: 7px;
+      background: #f8faff;
+      color: var(--accent);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0,0,0,0.5);
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .modal-overlay.open {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .modal-box {
+      width: min(100%, 820px);
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+      margin: 16px 0;
+    }
+    .modal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .modal-bar h3 { font-size: 15px; }
+    .modal-close {
+      width: 32px; height: 32px;
+      border: none; background: #eee;
+      border-radius: 50%; font-size: 18px; line-height: 32px;
+      cursor: pointer;
+    }
+    .modal-content {
+      padding: 24px 20px;
+      max-height: 70vh;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .modal-content table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .modal-content table td, .modal-content table th {
+      border: 1px solid #ccc;
+      padding: 4px 7px;
+    }
+    .modal-content img { max-width: 100%; height: auto; }
+
+    /* ── Action bar ── */
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 11px 16px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .1s;
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+    button:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-outline { background: #fff; color: var(--accent); border-color: var(--accent); }
+    .btn-ghost { background: #fff; color: var(--muted); border-color: var(--line); }
+    .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 6px; }
+    .btn-danger { background: #fff; color: var(--red); border-color: var(--red); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1200;
+      padding: 10px 22px;
+      border-radius: 20px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+    }
+    .toast.show { opacity: 1; pointer-events: auto; }
+
+    /* ── Signature ── */
+    .sig-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .sig-item {
+      flex: 1;
+      min-width: 90px;
+      padding: 6px 0;
+    }
+    .sig-item .sig-label { font-weight: 700; font-size: 13px; }
+    .sig-item .sig-line {
+      margin-top: 4px;
+      padding: 8px 0;
+      border-bottom: 1px solid #999;
+      color: #aaa;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════ TOP BAR ════ -->
+  <div class="topbar">
+    <span class="topbar-title">📋 样品评审报告生成器</span>
+    <button class="preview-btn" onclick="showPreview()">👁 预览</button>
+  </div>
+
+  <!-- ════ MAIN ════ -->
+  <div class="wrap">
+
+    <!-- ── 基本信息 ── -->
+    <div class="card">
+      <div class="card-header">基本信息</div>
+      <div class="card-body">
+        <div class="row">
+          <div class="field"><label>产品型号/名称</label><input id="productModel" placeholder="例如：HB-2026 实木床"></div>
+          <div class="field"><label>设计人员</label><input id="designer" placeholder=""></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>看样日期</label><input id="reviewDate" type="date"></div>
+          <div class="field"><label>供应商</label><input id="supplier" placeholder=""></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>记录人员</label><input id="recorder" placeholder=""></div>
+          <div class="field"><label>评审人员（多人用 / 分隔）</label><input id="reviewers" placeholder=""></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 产品图片 ── -->
+    <div class="card">
+      <div class="card-header">产品照片</div>
+      <div class="card-body">
+        <div class="img-grid" id="imgGrid"></div>
+        <button class="add-img-btn" onclick="addImageSlot()">+ 添加照片</button>
+      </div>
+    </div>
+
+    <!-- ── 外观及功能细节 ── -->
+    <div class="card">
+      <div class="card-header">产品外观及功能细节</div>
+      <div class="card-body">
+        <div class="field full" style="margin-bottom:10px;">
+          <label>功能参数</label>
+          <textarea id="funcParams" rows="2" placeholder="尺寸、材质、颜色、重量、额定功率等"></textarea>
+        </div>
+        <div class="field full">
+          <label>评审意见附加</label>
+          <textarea id="reviewNotes" rows="2" placeholder="总体评审意见..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ 7 大评审项 ════ -->
+    <div id="reviewGroups"></div>
+
+    <!-- ── 问题汇总改善清单 ── -->
+    <div class="card">
+      <div class="card-header">问题汇总改善清单 <span style="font-weight:400;font-size:12px;color:var(--muted);">（F 项 & 含整改内容项自动汇总）</span></div>
+      <div class="card-body">
+        <div id="summaryAutoArea"><p class="empty-hint">暂无自动汇总问题</p></div>
+        <div style="margin-top:8px;">
+          <div class="sub-section-title">手动添加问题</div>
+          <div id="summaryManualArea"></div>
+          <button class="btn-sm btn-outline" onclick="addManualIssue()" style="margin-top:6px;">+ 手动添加问题</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 签字确认 ── -->
+    <div class="card">
+      <div class="card-header">签字确认 <span style="font-weight:400;font-size:12px;color:var(--muted);">（打印后手签）</span></div>
+      <div class="card-body">
+        <div class="sig-row">
+          <div class="sig-item"><div class="sig-label">产品经理</div><div class="sig-line">手签区</div></div>
+          <div class="sig-item"><div class="sig-label">研发</div><div class="sig-line">手签区</div></div>
+          <div class="sig-item"><div class="sig-label">品质</div><div class="sig-line">手签区</div></div>
+          <div class="sig-item"><div class="sig-label">日期</div><div class="sig-line">____年__月__日</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 操作 ── -->
+    <div class="action-bar">
+      <button class="btn-primary" onclick="downloadDoc()">⬇ 生成并下载 .doc</button>
+      <button class="btn-outline" onclick="saveDraft()">💾 保存草稿</button>
+      <button class="btn-ghost" onclick="loadDraft()">📂 加载草稿</button>
+      <button class="btn-danger" onclick="resetAll()">🗑 清空重置</button>
+    </div>
+  </div>
+
+  <!-- ════ PREVIEW MODAL ════ -->
+  <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closePreview()">
+    <div class="modal-box">
+      <div class="modal-bar">
+        <h3>📄 报告预览</h3>
+        <button class="modal-close" onclick="closePreview()">✕</button>
+      </div>
+      <div class="modal-content" id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- ════ TOAST ════ -->
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   DATA
+   ══════════════════════════════════════ */
+const REVIEW_GROUPS = [
+  {
+    title: '包装开箱测评项',
+    items: ['产品外箱毛净重确认','产品围长确认','外箱印刷信息核对','开箱后内衬与物料摆放高端感','物料清单确认是否齐全','']
+  },
+  {
+    title: '外观&用料评审项',
+    items: ['实物样品与渲染效果图一致性','饰面与色样一致性','样品材料是否一致','饰面细节 有无瑕疵问题','样品与规格书参数内容核对','配合处间隙 断差','是否存在尖角风险点']
+  },
+  {
+    title: '功能评审项',
+    items: ['安装时长 人数评估','安装体验 安装是否困难 合理','说明书指引安装合理性','床屏部分 /稳定性','床侧围板部分 /稳定性','龙骨 排骨条 支撑脚部分 /稳定性','床脚 榫卯部分 /稳定性','储物功能体验','安装尖角规避','整床舒适性（搭配床垫）','起 坐噪音水平','翻身噪音水平','依靠床头噪音水平','五金-滑轨/偏摆 顺滑 承重 静音 防尘','五金-支架/防夹 顺滑','五金-紧固件/ 评估','五金-等新增配件评估','随床配件额外评估']
+  },
+  {
+    title: '电气项',
+    items: ['遥控/按钮外观功能 操作合理性','灯带颜色 效果','含电机或推杆配件 功能与噪音','排查评估 （走线 安装 位置等）','无线充功能','音响功能','阻燃要求'],
+    hasCert: true
+  },
+  {
+    title: '环保项',
+    items: ['产品开箱气味','环保法律法规项','','']
+  },
+  {
+    title: '结构零部件尺寸项',
+    items: ['主体零部件尺寸确认','配合件 榫头尺寸确认','加工工艺可制造型分析','']
+  },
+  {
+    title: '成本项',
+    items: ['实际报价@目标成本','','','']
+  }
+];
+
+let GLOBAL_ITEM_COUNT = 0;
+let IMAGE_SLOTS = 0;
+let MANUAL_ISSUES = []; // array of {id, desc, dept, deadline, note}
+
+/* ══════════════════════════════════════
+   HELPERS
+   ══════════════════════════════════════ */
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ══════════════════════════════════════
+   RENDER REVIEW ITEMS
+   ══════════════════════════════════════ */
+function renderReviewGroups() {
+  GLOBAL_ITEM_COUNT = 0;
+  const container = document.getElementById('reviewGroups');
+  let html = '';
+  REVIEW_GROUPS.forEach((group, gi) => {
+    const count = group.items.filter(Boolean).length;
+    html += `<details class="review-group" id="group-${gi}"${gi === 0 ? ' open' : ''}>`;
+    html += `<summary>${group.title} <span style="font-weight:400;font-size:12px;color:var(--muted);">(${count}项)</span></summary>`;
+    html += `<div class="group-body">`;
+    group.items.forEach((name) => {
+      if (!name.trim()) return;
+      const idx = GLOBAL_ITEM_COUNT++;
+      html += `
+        <div class="item-row" data-idx="${idx}" data-group="${gi}">
+          <div class="item-num">${idx + 1}</div>
+          <div class="item-name">${esc(name)}</div>
+          <div class="item-toggle">
+            <input type="radio" name="tgl-${idx}" id="p-${idx}" class="p-radio" value="P" onchange="onItemChange()">
+            <label for="p-${idx}">P</label>
+            <input type="radio" name="tgl-${idx}" id="f-${idx}" class="f-radio" value="F" onchange="onItemChange()">
+            <label for="f-${idx}">F</label>
+            <input type="radio" name="tgl-${idx}" id="o-${idx}" class="o-radio" value="O" onchange="onItemChange()">
+            <label for="o-${idx}">O</label>
+          </div>
+          <div class="item-fix"><input type="text" id="fix-${idx}" placeholder="整改内容" oninput="onItemChange()"></div>
+          <div class="item-person"><input type="text" id="person-${idx}" placeholder="责任人"></div>
+          ${group.hasCert ? `<div class="item-person"><input type="text" id="cert-${idx}" placeholder="认证要求" style="font-size:11px;"></div>` : ''}
+        </div>`;
+    });
+    html += `</div></details>`;
+  });
+  container.innerHTML = html;
+}
+
+/* ══════════════════════════════════════
+   GET ITEM DATA
+   ══════════════════════════════════════ */
+function getItemResult(idx) {
+  const p = document.getElementById('p-' + idx);
+  const f = document.getElementById('f-' + idx);
+  const o = document.getElementById('o-' + idx);
+  if (p && p.checked) return 'P';
+  if (f && f.checked) return 'F';
+  if (o && o.checked) return 'O';
+  return '';
+}
+function getItemFix(idx) { return (document.getElementById('fix-' + idx)?.value || '').trim(); }
+function getItemPerson(idx) { return (document.getElementById('person-' + idx)?.value || '').trim(); }
+function getItemCert(idx) {
+  const el = document.getElementById('cert-' + idx);
+  return el ? el.value.trim() : '';
+}
+function getItemName(idx) {
+  const row = document.querySelector(`.item-row[data-idx="${idx}"]`);
+  return row ? (row.querySelector('.item-name')?.textContent || '').trim() : '';
+}
+function getItemGroupTitle(idx) {
+  const row = document.querySelector(`.item-row[data-idx="${idx}"]`);
+  const gi = row ? row.dataset.group : '';
+  return REVIEW_GROUPS[gi] ? REVIEW_GROUPS[gi].title : '';
+}
+
+/* ══════════════════════════════════════
+   AUTO SUMMARY — stable rendering
+   ══════════════════════════════════════ */
+let _autoSummaryCache = {}; // idx -> {dept, deadline, note}
+
+function onItemChange() {
+  refreshAutoSummary();
+}
+
+function refreshAutoSummary() {
+  // Save current values before re-render
+  saveAutoSummaryValues();
+  renderAutoSummaryTable();
+  restoreAutoSummaryValues();
+}
+
+function saveAutoSummaryValues() {
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    const deptEl = document.getElementById('s-dept-' + i);
+    const deadlineEl = document.getElementById('s-deadline-' + i);
+    const noteEl = document.getElementById('s-note-' + i);
+    if (deptEl || deadlineEl || noteEl) {
+      _autoSummaryCache[i] = {
+        dept: deptEl ? deptEl.value : (_autoSummaryCache[i]?.dept || ''),
+        deadline: deadlineEl ? deadlineEl.value : (_autoSummaryCache[i]?.deadline || ''),
+        note: noteEl ? noteEl.value : (_autoSummaryCache[i]?.note || '')
+      };
+    }
+  }
+}
+
+function restoreAutoSummaryValues() {
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    const cached = _autoSummaryCache[i];
+    if (!cached) continue;
+    const deptEl = document.getElementById('s-dept-' + i);
+    const deadlineEl = document.getElementById('s-deadline-' + i);
+    const noteEl = document.getElementById('s-note-' + i);
+    if (deptEl) deptEl.value = cached.dept || '';
+    if (deadlineEl) deadlineEl.value = cached.deadline || '';
+    if (noteEl) noteEl.value = cached.note || '';
+  }
+}
+
+function getAutoSummaryRows() {
+  const rows = [];
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    const result = getItemResult(i);
+    const fix = getItemFix(i);
+    if (result === 'F' || fix) {
+      const name = getItemName(i);
+      rows.push({
+        idx: i,
+        desc: `${name}${fix ? '：' + fix : (result === 'F' ? '（未通过）' : '（有整改备注）')}`,
+        categoryTitle: getItemGroupTitle(i),
+        person: getItemPerson(i)
+      });
+    }
+  }
+  return rows;
+}
+
+function renderAutoSummaryTable() {
+  const area = document.getElementById('summaryAutoArea');
+  const rows = getAutoSummaryRows();
+  if (rows.length === 0) {
+    area.innerHTML = '<p class="empty-hint">暂无自动汇总问题</p>';
+    return;
+  }
+  let html = '<table class="summary-table"><thead><tr>';
+  html += '<th style="width:5%;">序号</th><th style="width:36%;">问题描述</th><th style="width:8%;">图片</th><th style="width:15%;">责任部门</th><th style="width:15%;">完成时间</th><th style="width:21%;">备注</th>';
+  html += '</tr></thead><tbody>';
+  rows.forEach((r, ri) => {
+    const cached = _autoSummaryCache[r.idx] || {};
+    html += `<tr>
+      <td style="text-align:center;">${ri + 1}</td>
+      <td>${esc(r.desc)}</td>
+      <td style="text-align:center;color:#999;">—</td>
+      <td><input type="text" id="s-dept-${r.idx}" value="${esc(cached.dept || r.person || '')}" placeholder="责任部门"></td>
+      <td><input type="text" id="s-deadline-${r.idx}" value="${esc(cached.deadline || '')}" placeholder="完成时间"></td>
+      <td><input type="text" id="s-note-${r.idx}" value="${esc(cached.note || '')}" placeholder="备注"></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+}
+
+/* ══════════════════════════════════════
+   MANUAL ISSUES
+   ══════════════════════════════════════ */
+function addManualIssue() {
+  const id = Date.now(); // unique ID
+  MANUAL_ISSUES.push({ id, desc: '', dept: '', deadline: '', note: '' });
+  renderManualIssues();
+}
+
+function removeManualIssue(id) {
+  MANUAL_ISSUES = MANUAL_ISSUES.filter(m => m.id !== id);
+  renderManualIssues();
+}
+
+function saveManualValues() {
+  MANUAL_ISSUES.forEach(m => {
+    m.desc = (document.getElementById('m-desc-' + m.id)?.value || '').trim();
+    m.dept = (document.getElementById('m-dept-' + m.id)?.value || '').trim();
+    m.deadline = (document.getElementById('m-deadline-' + m.id)?.value || '').trim();
+    m.note = (document.getElementById('m-note-' + m.id)?.value || '').trim();
+  });
+}
+
+function renderManualIssues() {
+  saveManualValues(); // save before re-render
+  const area = document.getElementById('summaryManualArea');
+  if (MANUAL_ISSUES.length === 0) {
+    area.innerHTML = '';
+    return;
+  }
+  let html = '<table class="summary-table"><thead><tr>';
+  html += '<th style="width:5%;">序号</th><th style="width:36%;">问题描述</th><th style="width:8%;">操作</th><th style="width:15%;">责任部门</th><th style="width:15%;">完成时间</th><th style="width:21%;">备注</th>';
+  html += '</tr></thead><tbody>';
+  MANUAL_ISSUES.forEach((m, mi) => {
+    html += `<tr>
+      <td style="text-align:center;">M${mi + 1}</td>
+      <td><input type="text" id="m-desc-${m.id}" value="${esc(m.desc)}" placeholder="问题描述"></td>
+      <td style="text-align:center;"><button class="del-btn" onclick="removeManualIssue(${m.id})" title="删除">×</button></td>
+      <td><input type="text" id="m-dept-${m.id}" value="${esc(m.dept)}" placeholder="责任部门"></td>
+      <td><input type="text" id="m-deadline-${m.id}" value="${esc(m.deadline)}" placeholder="完成时间"></td>
+      <td><input type="text" id="m-note-${m.id}" value="${esc(m.note)}" placeholder="备注"></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+}
+
+/* ══════════════════════════════════════
+   IMAGES
+   ══════════════════════════════════════ */
+function addImageSlot() {
+  IMAGE_SLOTS++;
+  renderImageSlots();
+}
+
+function renderImageSlots() {
+  const grid = document.getElementById('imgGrid');
+  let html = '';
+  for (let i = 0; i < IMAGE_SLOTS; i++) {
+    html += `
+      <div class="img-slot" id="imgSlot-${i}">
+        <button class="img-del" onclick="clearImageSlot(${i})">×</button>
+        <input type="file" accept="image/*" capture="environment" onchange="handleImage(this, ${i})" id="imgInput-${i}">
+        <div class="img-preview" id="imgPreview-${i}"></div>
+        <input type="text" class="img-caption" id="imgCaption-${i}" placeholder="图片说明（如：外观正面整体照）">
+      </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function clearImageSlot(i) {
+  const slot = document.getElementById('imgSlot-' + i);
+  const preview = document.getElementById('imgPreview-' + i);
+  const input = document.getElementById('imgInput-' + i);
+  const caption = document.getElementById('imgCaption-' + i);
+  if (slot) slot.classList.remove('filled');
+  if (preview) { preview.innerHTML = ''; delete preview.dataset.base64; }
+  if (input) input.value = '';
+  if (caption) caption.value = '';
+}
+
+function handleImage(input, i) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      // 目标：1.5cm×2cm @96dpi = 57×76px
+      const TW = 57, TH = 76;
+      canvas.width = TW;
+      canvas.height = TH;
+      const ctx = canvas.getContext('2d');
+      // 白色背景
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, TW, TH);
+      // 居中裁剪到 3:4
+      const srcRatio = img.width / img.height;
+      const dstRatio = TW / TH; // 0.75
+      let sx, sy, sw, sh;
+      if (srcRatio > dstRatio) {
+        // 原图更宽 → 裁左右
+        sh = img.height;
+        sw = sh * dstRatio;
+        sx = (img.width - sw) / 2;
+        sy = 0;
+      } else {
+        // 原图更高 → 裁上下
+        sw = img.width;
+        sh = sw / dstRatio;
+        sx = 0;
+        sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const preview = document.getElementById('imgPreview-' + i);
+      const slot = document.getElementById('imgSlot-' + i);
+      if (preview) {
+        preview.innerHTML = `<img src="${dataUrl}" alt="预览" style="width:100%;aspect-ratio:3/4;object-fit:contain;">`;
+        preview.dataset.base64 = dataUrl;
+      }
+      if (slot) slot.classList.add('filled');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function getImages() {
+  const imgs = [];
+  for (let i = 0; i < IMAGE_SLOTS; i++) {
+    const preview = document.getElementById('imgPreview-' + i);
+    const caption = document.getElementById('imgCaption-' + i);
+    const base64 = preview?.dataset?.base64;
+    if (base64) {
+      imgs.push({ data: base64, caption: caption ? caption.value.trim() : '' });
+    }
+  }
+  return imgs;
+}
+
+/* ══════════════════════════════════════
+   GENERATE .DOC (HTML-MHT)
+   ══════════════════════════════════════ */
+function generateReportHTML() {
+  // Save manual values before generating
+  saveManualValues();
+  saveAutoSummaryValues();
+
+  const model = val('productModel') || '__________';
+  const designer = val('designer') || '__________';
+  const reviewDate = val('reviewDate') || '__________';
+  const supplier = val('supplier') || '__________';
+  const recorder = val('recorder') || '__________';
+  const reviewers = val('reviewers') || '__________';
+  const funcParams = val('funcParams') || '';
+  const reviewNotesText = val('reviewNotes') || '';
+  const images = getImages();
+
+  function h(s) { return esc(s).replace(/\n/g, '<br>'); }
+
+  // Images HTML
+  let imgHtml = '';
+  images.forEach((img, i) => {
+    imgHtml += `<p style="margin:6px 0;">`;
+    imgHtml += `<img src="${img.data}" style="width:1.5cm;height:2cm;border:1px solid #ddd;" alt="图${i+1}"><br>`;
+    imgHtml += `<span style="font-size:9pt;color:#555;">图${i+1}：${h(img.caption || '（无说明）')}</span></p>`;
+  });
+  if (!imgHtml) imgHtml = '<p style="color:#999;">（未上传产品照片）</p>';
+
+  // Build grouped review items table
+  let itemsHtml = '';
+  const grouped = {};
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    const gi = document.querySelector(`.item-row[data-idx="${i}"]`)?.dataset.group;
+    if (!grouped[gi]) grouped[gi] = [];
+    grouped[gi].push(i);
+  }
+  const resultLabels = { 'P': 'P ✓', 'F': 'F ✗', 'O': 'N/A', '': '' };
+
+  Object.keys(grouped).forEach(gk => {
+    const grp = REVIEW_GROUPS[gk];
+    if (!grp) return;
+    itemsHtml += `<tr><td colspan="6" style="background:#e5e5e5;font-weight:bold;font-size:10pt;">${h(grp.title)}</td></tr>`;
+    grouped[gk].forEach((idx, ii) => {
+      const result = getItemResult(idx);
+      const rl = resultLabels[result] || result;
+      itemsHtml += `<tr>
+        <td style="text-align:center;">${ii + 1}</td>
+        <td>${h(getItemName(idx))}</td>
+        <td style="text-align:center;font-weight:bold;">${rl}</td>
+        <td>${h(getItemFix(idx))}</td>
+        <td>${h(getItemPerson(idx))}</td>
+        <td>${h(getItemCert(idx))}</td>
+      </tr>`;
+    });
+  });
+
+  // Summary rows
+  const autoRows = getAutoSummaryRows();
+  let summaryHtml = '';
+  autoRows.forEach((r, ri) => {
+    const cached = _autoSummaryCache[r.idx] || {};
+    summaryHtml += `<tr>
+      <td style="text-align:center;">${ri + 1}</td>
+      <td>${h(r.desc)}</td>
+      <td style="text-align:center;">—</td>
+      <td>${h(cached.dept || r.person || '')}</td>
+      <td>${h(cached.deadline || '')}</td>
+      <td>${h(cached.note || '')}</td>
+    </tr>`;
+  });
+  MANUAL_ISSUES.forEach((m, mi) => {
+    if (!m.desc) return;
+    summaryHtml += `<tr>
+      <td style="text-align:center;">M${mi + 1}</td>
+      <td>${h(m.desc)}</td>
+      <td style="text-align:center;">—</td>
+      <td>${h(m.dept)}</td>
+      <td>${h(m.deadline)}</td>
+      <td>${h(m.note)}</td>
+    </tr>`;
+  });
+
+  const doc = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="ProgId" content="Word.Document">
+<!--[if gte mso 9]><xml>
+<w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+  <w:BrowserLevel>MicrosoftInternetExplorer4</w:BrowserLevel>
+</w:WordDocument>
+</xml><![endif]-->
+<style>
+  /* ══ A4 页面设置 ══ */
+  @page {
+    size: 210mm 297mm;
+    margin-top: 18mm;
+    margin-bottom: 18mm;
+    margin-left: 16mm;
+    margin-right: 16mm;
+    mso-page-orientation: portrait;
+    mso-header-margin: 8mm;
+    mso-footer-margin: 8mm;
+    mso-paper-source: 0;
+  }
+  @page Section1 {
+    size: 210mm 297mm;
+    margin-top: 18mm;
+    margin-bottom: 18mm;
+    margin-left: 16mm;
+    margin-right: 16mm;
+    mso-page-orientation: portrait;
+    mso-header-margin: 8mm;
+    mso-footer-margin: 8mm;
+    mso-paper-source: 0;
+  }
+  div.Section1 { page: Section1; }
+
+  body {
+    font-family: "Microsoft YaHei","宋体",SimSun,serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: #000;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 15pt;
+    font-weight: bold;
+    margin: 0 0 10pt 0;
+    padding: 0;
+  }
+
+  h2 {
+    font-size: 11pt;
+    font-weight: bold;
+    margin: 12pt 0 6pt 0;
+    border-bottom: 1px solid #999;
+    padding-bottom: 2pt;
+  }
+
+  /* 所有表格通用 */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 6pt 0;
+    font-size: 8.5pt;
+    table-layout: fixed;
+    mso-table-lspace: 0pt;
+    mso-table-rspace: 0pt;
+  }
+  table td, table th {
+    border: 1px solid #000;
+    padding: 3pt 4pt;
+    vertical-align: top;
+    word-break: break-all;
+  }
+  table th {
+    background: #d9d9d9;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .info-table { table-layout: auto; }
+  .info-table td { border: 1px solid #000; padding: 4pt 5pt; }
+  .sig-table { table-layout: auto; }
+  .sig-table td { border: none; padding: 5pt 8pt; }
+
+  .note { font-size: 8pt; color: #555; }
+
+  /* 图片固定尺寸：1.5cm × 2cm（1.5:2 比例） */
+  img {
+    width: 1.5cm;
+    height: 2cm;
+    mso-width-percent: 0;
+  }
+</style>
+</head>
+<body>
+<div class="Section1">
+
+<h1>产 品 评 审 报 告 / 附 件</h1>
+<p style="text-align:right;font-size:8pt;margin:0 0 8pt 0;">保存期限：三年</p>
+
+<table class="info-table">
+<tr>
+  <td style="width:13%;"><b>产品型号/名称</b></td>
+  <td style="width:28%;">${h(model)}</td>
+  <td style="width:10%;"><b>设计人员</b></td>
+  <td style="width:17%;">${h(designer)}</td>
+  <td style="width:10%;"><b>看样日期</b></td>
+  <td style="width:22%;">${h(reviewDate)}</td>
+</tr>
+<tr>
+  <td><b>供应商</b></td><td>${h(supplier)}</td>
+  <td><b>记录人员</b></td><td>${h(recorder)}</td>
+  <td colspan="2"></td>
+</tr>
+<tr>
+  <td><b>评审人员</b></td>
+  <td colspan="5">${h(reviewers)}</td>
+</tr>
+<tr>
+  <td colspan="6">
+    <b>产品外观及功能细节</b><br>
+    ${imgHtml}
+    <p style="margin:4pt 0;"><b>功能参数：</b>${h(funcParams) || '（未填写）'}</p>
+    <p style="margin:4pt 0;"><b>评审意见附加：</b>${h(reviewNotesText) || '（未填写）'}</p>
+  </td>
+</tr>
+</table>
+
+<h2>产品体验标准项目</h2>
+<p class="note">注：产品未涉及项目标记为 N/A。</p>
+<table class="review-table">
+<colgroup>
+  <col style="width:6%;">
+  <col style="width:32%;">
+  <col style="width:9%;">
+  <col style="width:28%;">
+  <col style="width:11%;">
+  <col style="width:14%;">
+</colgroup>
+<thead>
+  <tr><th>序号</th><th>项目</th><th>P/F/O</th><th>整改内容</th><th>责任人</th><th>认证要求</th></tr>
+</thead>
+<tbody>${itemsHtml}</tbody>
+</table>
+
+<h2>问题汇总改善清单</h2>
+<table>
+<colgroup>
+  <col style="width:5%;">
+  <col style="width:38%;">
+  <col style="width:7%;">
+  <col style="width:14%;">
+  <col style="width:14%;">
+  <col style="width:22%;">
+</colgroup>
+<thead>
+  <tr><th>序号</th><th>问题描述</th><th>图片</th><th>责任部门</th><th>完成时间</th><th>备注</th></tr>
+</thead>
+<tbody>${summaryHtml || '<tr><td colspan="6" style="text-align:center;color:#999;">无</td></tr>'}</tbody>
+</table>
+
+<h2>签字确认</h2>
+<table class="sig-table" style="margin-top:16pt;">
+<tr>
+  <td style="width:18%;"><b>产品经理：</b></td>
+  <td style="width:32%;border-bottom:1px solid #000;">&nbsp;</td>
+  <td style="width:18%;"><b>研发：</b></td>
+  <td style="width:32%;border-bottom:1px solid #000;">&nbsp;</td>
+</tr>
+<tr><td colspan="4" style="height:10pt;">&nbsp;</td></tr>
+<tr>
+  <td><b>品质：</b></td>
+  <td style="border-bottom:1px solid #000;">&nbsp;</td>
+  <td><b>日期：</b></td>
+  <td style="border-bottom:1px solid #000;">&nbsp;</td>
+</tr>
+</table>
+
+</div>
+</body>
+</html>`;
+
+  return doc;
+}
+
+/* ══════════════════════════════════════
+   DOWNLOAD .doc
+   ══════════════════════════════════════ */
+function downloadDoc() {
+  const html = generateReportHTML();
+  const model = val('productModel') || '未命名';
+  const date = val('reviewDate') || new Date().toISOString().slice(0, 10);
+  const filename = `样品评审报告_${model}_${date}.doc`;
+  const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  showToast('✅ 报告已下载！用 Word 或 WPS 打开');
+}
+
+/* ══════════════════════════════════════
+   PREVIEW
+   ══════════════════════════════════════ */
+function showPreview() {
+  saveAutoSummaryValues();
+  saveManualValues();
+  refreshAutoSummary();
+  const html = generateReportHTML();
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  document.getElementById('modalContent').innerHTML = bodyMatch ? bodyMatch[1] : html;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePreview() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ══════════════════════════════════════
+   SAVE / LOAD DRAFT
+   ══════════════════════════════════════ */
+function saveDraft() {
+  saveManualValues();
+  saveAutoSummaryValues();
+
+  const items = [];
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    items.push({
+      result: getItemResult(i),
+      fix: getItemFix(i),
+      person: getItemPerson(i),
+      cert: getItemCert(i)
+    });
+  }
+
+  const imgCaps = [];
+  for (let i = 0; i < IMAGE_SLOTS; i++) {
+    const el = document.getElementById('imgCaption-' + i);
+    imgCaps.push(el ? el.value.trim() : '');
+  }
+
+  const draft = {
+    timestamp: new Date().toISOString(),
+    productModel: val('productModel'),
+    designer: val('designer'),
+    reviewDate: val('reviewDate'),
+    supplier: val('supplier'),
+    recorder: val('recorder'),
+    reviewers: val('reviewers'),
+    funcParams: val('funcParams'),
+    reviewNotes: val('reviewNotes'),
+    items: items,
+    imageSlots: IMAGE_SLOTS,
+    imageCaptions: imgCaps,
+    summaryCache: _autoSummaryCache,
+    manualIssues: MANUAL_ISSUES,
+    manualCount: MANUAL_ISSUES.length
+  };
+
+  try {
+    localStorage.setItem('sample_review_draft', JSON.stringify(draft));
+    showToast('💾 草稿已保存（图片需重新上传）');
+  } catch (e) {
+    showToast('❌ 保存失败，请检查存储空间');
+  }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem('sample_review_draft');
+    if (!raw) { showToast('📭 没有已保存的草稿'); return; }
+    const d = JSON.parse(raw);
+
+    document.getElementById('productModel').value = d.productModel || '';
+    document.getElementById('designer').value = d.designer || '';
+    document.getElementById('reviewDate').value = d.reviewDate || '';
+    document.getElementById('supplier').value = d.supplier || '';
+    document.getElementById('recorder').value = d.recorder || '';
+    document.getElementById('reviewers').value = d.reviewers || '';
+    document.getElementById('funcParams').value = d.funcParams || '';
+    document.getElementById('reviewNotes').value = d.reviewNotes || '';
+
+    // Restore image slots & captions
+    if (d.imageSlots !== undefined) {
+      IMAGE_SLOTS = Math.max(0, d.imageSlots);
+      renderImageSlots();
+      if (d.imageCaptions) {
+        d.imageCaptions.forEach((cap, i) => {
+          const el = document.getElementById('imgCaption-' + i);
+          if (el) el.value = cap || '';
+        });
+      }
+    }
+
+    // Restore review items
+    if (d.items) {
+      d.items.forEach((item, i) => {
+        if (item.result) {
+          const radio = document.getElementById(item.result.toLowerCase() + '-' + i);
+          if (radio) radio.checked = true;
+        }
+        const fixEl = document.getElementById('fix-' + i);
+        if (fixEl) fixEl.value = item.fix || '';
+        const personEl = document.getElementById('person-' + i);
+        if (personEl) personEl.value = item.person || '';
+        const certEl = document.getElementById('cert-' + i);
+        if (certEl) certEl.value = item.cert || '';
+      });
+    }
+
+    // Restore summary cache
+    _autoSummaryCache = d.summaryCache || {};
+
+    // Restore manual issues
+    MANUAL_ISSUES = d.manualIssues || [];
+    if (d.manualCount && !d.manualIssues) {
+      // Legacy: just set count
+      MANUAL_ISSUES = [];
+    }
+
+    renderAutoSummaryTable();
+    restoreAutoSummaryValues();
+    renderManualIssues();
+
+    showToast('📂 草稿已加载');
+  } catch (e) {
+    showToast('❌ 加载失败，草稿数据可能损坏');
+    console.error(e);
+  }
+}
+
+/* ══════════════════════════════════════
+   RESET
+   ══════════════════════════════════════ */
+function resetAll() {
+  if (!confirm('确定要清空所有内容吗？此操作不可恢复。')) return;
+
+  ['productModel','designer','reviewDate','supplier','recorder','reviewers','funcParams','reviewNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  for (let i = 0; i < GLOBAL_ITEM_COUNT; i++) {
+    ['p','f','o'].forEach(v => {
+      const r = document.getElementById(v + '-' + i);
+      if (r) r.checked = false;
+    });
+    ['fix','person','cert'].forEach(f => {
+      const el = document.getElementById(f + '-' + i);
+      if (el) el.value = '';
+    });
+  }
+
+  IMAGE_SLOTS = 1;
+  renderImageSlots();
+  MANUAL_ISSUES = [];
+  _autoSummaryCache = {};
+  renderAutoSummaryTable();
+  renderManualIssues();
+  localStorage.removeItem('sample_review_draft');
+  document.querySelectorAll('.review-group[open]').forEach(d => d.open = false);
+
+  const dateEl = document.getElementById('reviewDate');
+  if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
+
+  showToast('🗑 已全部清空');
+}
+
+/* ══════════════════════════════════════
+   TOAST
+   ══════════════════════════════════════ */
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+/* ══════════════════════════════════════
+   INIT
+   ══════════════════════════════════════ */
+function init() {
+  renderReviewGroups();
+  IMAGE_SLOTS = 1;
+  renderImageSlots();
+  refreshAutoSummary();
+  renderManualIssues();
+  const dateEl = document.getElementById('reviewDate');
+  if (dateEl && !dateEl.value) {
+    dateEl.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
