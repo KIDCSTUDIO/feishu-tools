@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes" />
   <title>样品评审报告生成器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --bg: #f3f4f6;
@@ -564,7 +565,7 @@
 
     <!-- ── 操作 ── -->
     <div class="action-bar">
-      <button class="btn-primary" onclick="downloadDoc()">⬇ 生成并下载 .doc</button>
+      <button class="btn-primary" onclick="exportPDF()">📄 导出 PDF</button>
       <button class="btn-outline" onclick="saveDraft()">💾 保存草稿</button>
       <button class="btn-ghost" onclick="loadDraft()">📂 加载草稿</button>
       <button class="btn-danger" onclick="resetAll()">🗑 清空重置</button>
@@ -584,6 +585,9 @@
 
   <!-- ════ TOAST ════ -->
   <div class="toast" id="toast"></div>
+
+  <!-- ════ PDF 渲染容器 ════ -->
+  <div id="pdfRender" style="position:fixed;top:0;left:0;width:210mm;z-index:-1;background:#fff;pointer-events:none;"></div>
 
 <script>
 /* ══════════════════════════════════════
@@ -872,8 +876,8 @@ function handleImage(input, i) {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
-      // 目标：1.5cm×2cm @96dpi = 57×76px
-      const TW = 57, TH = 76;
+      // PDF 高清输出：225×300px（3:4），显示 1.5cm×2cm
+      const TW = 225, TH = 300;
       canvas.width = TW;
       canvas.height = TH;
       const ctx = canvas.getContext('2d');
@@ -898,7 +902,7 @@ function handleImage(input, i) {
         sy = (img.height - sh) / 2;
       }
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       const preview = document.getElementById('imgPreview-' + i);
       const slot = document.getElementById('imgSlot-' + i);
       if (preview) {
@@ -1204,23 +1208,65 @@ function generateReportHTML() {
 }
 
 /* ══════════════════════════════════════
-   DOWNLOAD .doc
+   EXPORT PDF
    ══════════════════════════════════════ */
-function downloadDoc() {
-  const html = generateReportHTML();
+function exportPDF() {
+  saveAutoSummaryValues();
+  saveManualValues();
+  refreshAutoSummary();
+  const reportHTML = generateReportHTML();
+
+  // 提取 body 和 style
+  const bodyMatch = reportHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : reportHTML;
+  const styleMatch = reportHTML.match(/<style[^>]*>([\s\S]*)<\/style>/i);
+  let reportStyles = styleMatch ? styleMatch[1] : '';
+  // 修正选择器
+  reportStyles = reportStyles.replace(/body\s*\{/g, '.pdf-root {');
+  reportStyles = reportStyles.replace(/@page[^}]*\}/g, '');
+  reportStyles = reportStyles.replace(/div\.Section1\s*\{[^}]*\}/g, '');
+  reportStyles = reportStyles.replace(/img\s*\{/g, 'img {');
+
+  // 渲染到隐藏容器
+  const container = document.getElementById('pdfRender');
+  container.style.zIndex = '99999';
+  container.style.opacity = '0';
+  container.innerHTML =
+    '<style>' + reportStyles + '</style>' +
+    '<div class="pdf-root" style="padding:8mm;font-family:\'Microsoft YaHei\',\'宋体\',SimSun,serif;font-size:10pt;line-height:1.6;color:#000;">' +
+    bodyContent + '</div>';
+
+  if (typeof html2pdf === 'undefined') {
+    showToast('⚠️ PDF 库加载中，请稍后重试');
+    return;
+  }
+
+  showToast('⏳ 正在生成 PDF...');
+
   const model = val('productModel') || '未命名';
   const date = val('reviewDate') || new Date().toISOString().slice(0, 10);
-  const filename = `样品评审报告_${model}_${date}.doc`;
-  const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
-  showToast('✅ 报告已下载！用 Word 或 WPS 打开');
+  const filename = '样品评审报告_' + model + '_' + date + '.pdf';
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(container).save().then(function () {
+    container.innerHTML = '';
+    container.style.zIndex = '-1';
+    container.style.opacity = '';
+    showToast('✅ PDF 已下载！');
+  }).catch(function () {
+    container.innerHTML = '';
+    container.style.zIndex = '-1';
+    container.style.opacity = '';
+    showToast('❌ 生成失败，请重试');
+  });
 }
 
 /* ══════════════════════════════════════
