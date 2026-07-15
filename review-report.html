@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes" />
   <title>样品评审报告生成器</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --bg: #f3f4f6;
@@ -586,9 +585,6 @@
   <!-- ════ TOAST ════ -->
   <div class="toast" id="toast"></div>
 
-  <!-- ════ PDF 渲染容器 ════ -->
-  <div id="pdfRender" style="position:fixed;top:0;left:0;width:210mm;z-index:-1;background:#fff;pointer-events:none;"></div>
-
 <script>
 /* ══════════════════════════════════════
    DATA
@@ -839,22 +835,27 @@ function renderManualIssues() {
    ══════════════════════════════════════ */
 function addImageSlot() {
   IMAGE_SLOTS++;
-  renderImageSlots();
+  appendOneImageSlot(IMAGE_SLOTS - 1);
+}
+
+function appendOneImageSlot(i) {
+  const grid = document.getElementById('imgGrid');
+  const div = document.createElement('div');
+  div.className = 'img-slot';
+  div.id = 'imgSlot-' + i;
+  div.innerHTML =
+    '<button class="img-del" onclick="clearImageSlot(' + i + ')">×</button>' +
+    '<input type="file" accept="image/*" onchange="handleImage(this, ' + i + ')" id="imgInput-' + i + '">' +
+    '<div class="img-preview" id="imgPreview-' + i + '"></div>' +
+    '<input type="text" class="img-caption" id="imgCaption-' + i + '" placeholder="图片说明（如：外观正面整体照）">';
+  grid.appendChild(div);
 }
 
 function renderImageSlots() {
-  const grid = document.getElementById('imgGrid');
-  let html = '';
+  document.getElementById('imgGrid').innerHTML = '';
   for (let i = 0; i < IMAGE_SLOTS; i++) {
-    html += `
-      <div class="img-slot" id="imgSlot-${i}">
-        <button class="img-del" onclick="clearImageSlot(${i})">×</button>
-        <input type="file" accept="image/*" capture="environment" onchange="handleImage(this, ${i})" id="imgInput-${i}">
-        <div class="img-preview" id="imgPreview-${i}"></div>
-        <input type="text" class="img-caption" id="imgCaption-${i}" placeholder="图片说明（如：外观正面整体照）">
-      </div>`;
+    appendOneImageSlot(i);
   }
-  grid.innerHTML = html;
 }
 
 function clearImageSlot(i) {
@@ -876,37 +877,37 @@ function handleImage(input, i) {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
-      // PDF 高清输出：225×300px（3:4），显示 1.5cm×2cm
-      const TW = 225, TH = 300;
-      canvas.width = TW;
-      canvas.height = TH;
-      const ctx = canvas.getContext('2d');
-      // 白色背景
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, TW, TH);
-      // 居中裁剪到 3:4
+      const MAX = 1200; // 长边上限，保证高清但不过大
+      const DST_RATIO = 0.75; // 3:4 = 1.5:2
+      // 先计算 3:4 裁剪区域（在原图坐标中）
       const srcRatio = img.width / img.height;
-      const dstRatio = TW / TH; // 0.75
       let sx, sy, sw, sh;
-      if (srcRatio > dstRatio) {
-        // 原图更宽 → 裁左右
+      if (srcRatio > DST_RATIO) {
         sh = img.height;
-        sw = sh * dstRatio;
+        sw = sh * DST_RATIO;
         sx = (img.width - sw) / 2;
         sy = 0;
       } else {
-        // 原图更高 → 裁上下
         sw = img.width;
-        sh = sw / dstRatio;
+        sh = sw / DST_RATIO;
         sx = 0;
         sy = (img.height - sh) / 2;
       }
+      // 输出尺寸：缩放 sw×sh 到 MAX 内
+      let TW = sw, TH = sh;
+      if (TW > MAX) { TH = Math.round(TH * MAX / TW); TW = MAX; }
+      if (TH > MAX) { TW = Math.round(TW * MAX / TH); TH = MAX; }
+      canvas.width = TW;
+      canvas.height = TH;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, TW, TH);
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       const preview = document.getElementById('imgPreview-' + i);
       const slot = document.getElementById('imgSlot-' + i);
       if (preview) {
-        preview.innerHTML = `<img src="${dataUrl}" alt="预览" style="width:100%;aspect-ratio:3/4;object-fit:contain;">`;
+        preview.innerHTML = '<img src="' + dataUrl + '" alt="预览" style="width:100%;aspect-ratio:3/4;object-fit:contain;">';
         preview.dataset.base64 = dataUrl;
       }
       if (slot) slot.classList.add('filled');
@@ -1208,7 +1209,7 @@ function generateReportHTML() {
 }
 
 /* ══════════════════════════════════════
-   EXPORT PDF
+   EXPORT PDF — 浏览器原生打印
    ══════════════════════════════════════ */
 function exportPDF() {
   saveAutoSummaryValues();
@@ -1216,57 +1217,18 @@ function exportPDF() {
   refreshAutoSummary();
   const reportHTML = generateReportHTML();
 
-  // 提取 body 和 style
-  const bodyMatch = reportHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  const bodyContent = bodyMatch ? bodyMatch[1] : reportHTML;
-  const styleMatch = reportHTML.match(/<style[^>]*>([\s\S]*)<\/style>/i);
-  let reportStyles = styleMatch ? styleMatch[1] : '';
-  // 修正选择器
-  reportStyles = reportStyles.replace(/body\s*\{/g, '.pdf-root {');
-  reportStyles = reportStyles.replace(/@page[^}]*\}/g, '');
-  reportStyles = reportStyles.replace(/div\.Section1\s*\{[^}]*\}/g, '');
-  reportStyles = reportStyles.replace(/img\s*\{/g, 'img {');
-
-  // 渲染到隐藏容器
-  const container = document.getElementById('pdfRender');
-  container.style.zIndex = '99999';
-  container.style.opacity = '0';
-  container.innerHTML =
-    '<style>' + reportStyles + '</style>' +
-    '<div class="pdf-root" style="padding:8mm;font-family:\'Microsoft YaHei\',\'宋体\',SimSun,serif;font-size:10pt;line-height:1.6;color:#000;">' +
-    bodyContent + '</div>';
-
-  if (typeof html2pdf === 'undefined') {
-    showToast('⚠️ PDF 库加载中，请稍后重试');
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('⚠️ 弹窗被拦截，请允许本站弹窗');
     return;
   }
+  w.document.write(reportHTML);
+  w.document.close();
 
-  showToast('⏳ 正在生成 PDF...');
-
-  const model = val('productModel') || '未命名';
-  const date = val('reviewDate') || new Date().toISOString().slice(0, 10);
-  const filename = '样品评审报告_' + model + '_' + date + '.pdf';
-
-  const opt = {
-    margin: [8, 8, 8, 8],
-    filename: filename,
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-  };
-
-  html2pdf().set(opt).from(container).save().then(function () {
-    container.innerHTML = '';
-    container.style.zIndex = '-1';
-    container.style.opacity = '';
-    showToast('✅ PDF 已下载！');
-  }).catch(function () {
-    container.innerHTML = '';
-    container.style.zIndex = '-1';
-    container.style.opacity = '';
-    showToast('❌ 生成失败，请重试');
-  });
+  setTimeout(function () {
+    w.print();
+    showToast('🖨 打印对话框已打开 → 选择「另存为 PDF」');
+  }, 600);
 }
 
 /* ══════════════════════════════════════
